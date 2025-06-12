@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+    <h1>Dashboard</h1>
+    <p>Welkom, {{ user['email'] if 'email' in user else user['login'] }}</p>
+    <a href="/logout">Uitloggen</a>
+</body>
+</html>
