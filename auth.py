@@ -1,10 +1,16 @@
-from starlette.requests import Request
+from fastapi import APIRouter, Request
 from authlib.integrations.starlette_client import OAuth
 from starlette.responses import RedirectResponse
+from models import SessionLocal, User
+from dotenv import load_dotenv
 import os
 
+load_dotenv()
+
+router = APIRouter()
 oauth = OAuth()
 
+# Discord
 oauth.register(
     name='discord',
     client_id=os.getenv("DISCORD_CLIENT_ID"),
@@ -15,6 +21,7 @@ oauth.register(
     client_kwargs={'scope': 'identify email'}
 )
 
+# GitHub
 oauth.register(
     name='github',
     client_id=os.getenv("GITHUB_CLIENT_ID"),
@@ -25,28 +32,31 @@ oauth.register(
     client_kwargs={'scope': 'user:email'}
 )
 
-async def get_current_user(request: Request):
-    return request.session.get("user")
+@router.get("/login/{provider}")
+async def login(request: Request, provider: str):
+    redirect_uri = request.url_for("auth_callback", provider=provider)
+    return await oauth.create_client(provider).authorize_redirect(request, redirect_uri)
 
-async def login(request: Request):
-    provider = request.path_params['provider']
-    redirect_uri = request.url_for("auth", provider=provider)
+@router.get("/auth/{provider}")
+async def auth_callback(request: Request, provider: str):
     client = oauth.create_client(provider)
-    return await client.authorize_redirect(request, redirect_uri)
+    token = await client.authorize_access_token(request)
+    user_info = await client.get('users/@me' if provider == 'discord' else 'user')
+    user_data = user_info.json()
 
-async def auth(request: Request):
-    provider = request.path_params['provider']
-    client = oauth.create_client(provider)
-    try:
-        token = await client.authorize_access_token(request)
-        endpoint = 'users/@me' if provider == 'discord' else 'user'
-        resp = await client.get(endpoint, token=token)
-        user = resp.json()
-        request.session['user'] = user
-    except Exception:
-        return RedirectResponse(url="/login?error=auth_failed")
-    return RedirectResponse(url="/dashboard")
+    email = user_data.get("email") or (user_data["login"] + "@github.com")
+    oauth_id = str(user_data["id"])
 
-async def logout(request: Request):
-    request.session.pop("user", None)
+    db = SessionLocal()
+    user = db.query(User).filter(User.oauth_id == oauth_id, User.oauth_provider == provider).first()
+    if not user:
+        user = User(
+            oauth_provider=provider,
+            oauth_id=oauth_id,
+            email=email
+        )
+        db.add(user)
+        db.commit()
+
+    request.session["user"] = {"id": user.id, "email": user.email, "role": user.role}
     return RedirectResponse(url="/")
