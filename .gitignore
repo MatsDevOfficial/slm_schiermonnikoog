@@ -1,0 +1,4 @@
+# Negeer .env-bestanden
+.env
+.env.local
+.env.*.local
