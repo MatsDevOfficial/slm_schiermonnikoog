@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-jinja2
-authlib
-httpx
-stripe
-sqlalchemy
-databases
-python-dotenv
