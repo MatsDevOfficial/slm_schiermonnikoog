@@ -88,8 +88,10 @@ def chat():
             print("Bot: Sorry, ik kon geen relevante info vinden.\n")
             continue
         context = " ".join(relevante_passages)
+        print("Bot: Antwoord genereren...")  # <--- hier de melding
         antwoord = generate_answer(context, vraag)
         print(f"Bot: {antwoord}\n")
+
 
 if __name__ == "__main__":
     chat()
